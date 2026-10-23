@@ -1,0 +1,134 @@
+/* modal-shell — generic modal structure: overlay + panel with pinned
+   header/footer and a scrollable body. Pair with modal-shell.js for
+   open/close/focus mechanics. The shell owns layout and layering only;
+   all content and page logic stays in the page.
+
+   Layering (see tokens/README.md): the overlay sits at --ui-z-modal.
+   Anchored panels (dropdowns, date pickers) opened from inside a modal
+   portal to <body> at --ui-z-popover; blocking busy overlays cover the
+   modal at --ui-z-busy; toasts stay visible above everything interactive
+   at --ui-z-toast. */
+
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: var(--ui-overlay, rgb(15 23 42 / 0.45));
+  backdrop-filter: blur(4px);
+  z-index: var(--ui-z-modal, 1000);
+  opacity: 0;
+  transition: opacity var(--ui-dur-base, 200ms) var(--ui-ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.ui-modal-overlay[hidden] {
+  display: none;
+}
+
+.ui-modal-overlay.is-open {
+  opacity: 1;
+}
+
+/* ─── Panel ──────────────────────────────────────────────────────────── */
+
+.ui-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* header/footer stay pinned; only the body scrolls */
+  width: 90%;
+  max-width: 640px; /* md default; see size variants below */
+  max-height: 85vh;
+  background: var(--ui-surface-raised, #ffffff);
+  color: var(--ui-text, #0f172a);
+  border: 1px solid var(--ui-border, #e2e8f0);
+  border-radius: var(--ui-radius-md, 10px);
+  box-shadow: var(--ui-shadow-3, 0 12px 32px rgb(15 23 42 / 0.18));
+  transform: scale(0.96) translateY(8px);
+  transition: transform var(--ui-dur-base, 200ms) var(--ui-ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.ui-modal-overlay.is-open .ui-modal {
+  transform: none;
+}
+
+/* Size variants — width caps only; pages may still override max-width
+   inline for one-off content. */
+.ui-modal--sm { max-width: 420px; }
+.ui-modal--lg { max-width: 1000px; }
+
+/* ─── Regions ────────────────────────────────────────────────────────── */
+
+.ui-modal__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--ui-border, #e2e8f0);
+}
+
+.ui-modal__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.ui-modal__close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--ui-text-muted, #64748b);
+  background: transparent;
+  border: none;
+  border-radius: var(--ui-radius-sm, 6px);
+  cursor: pointer;
+  transition: background var(--ui-dur-fast, 120ms) var(--ui-ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.ui-modal__close:hover {
+  background: var(--ui-surface-hover, #f1f5f9);
+}
+
+.ui-modal__close:focus-visible {
+  outline: 3px solid var(--ui-focus-ring, rgb(37 99 235 / 0.4));
+  outline-offset: 1px;
+}
+
+.ui-modal__body {
+  flex: 1 1 auto;
+  min-height: 0; /* lets the flex child shrink so overflow engages */
+  overflow-y: auto;
+  overscroll-behavior: contain; /* body scroll never chains to the page */
+  padding: 1.5rem;
+}
+
+.ui-modal__footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--ui-border, #e2e8f0);
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-modal-overlay,
+  .ui-modal,
+  .ui-modal__close {
+    transition-duration: 0ms;
+  }
+}

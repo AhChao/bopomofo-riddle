@@ -1,0 +1,105 @@
+/* input-action-row — a single-line control row: a text input that grows to fill,
+   glued to a PRIMARY (commit) button and a SECONDARY (cancel/dismiss) button.
+   The collectible artifact is the RESPONSIVE-DEGRADATION layout contract, not the
+   colors. De-themed: every visual value maps to a --ui-* token + neutral fallback.
+
+   Layout invariants encoded here:
+   - PRIMARY-GLUED-TO-INPUT: the commit button sits immediately after the input,
+     where the eye lands after typing. Input and its commit action never separate.
+   - GRACEFUL DEGRADATION: the row wraps (flex-wrap). The input has a min-width
+     floor so it is never crushed to a sliver; when the row can't fit on one line,
+     the input keeps the first line full-width (flex-grow) and the whole action
+     group drops to the next line TOGETHER (the buttons live in a nowrap group, so
+     they can never split apart).
+   - OWN-ROW guard: `.iar-field` claims a full container line (flex-basis:100%) so
+     the row is never paired into a half-width slot by a flex-wrap parent. */
+
+/* OWN-ROW guard — put this on the row's wrapper when it is dropped into a
+   flex-wrap parent (a grid of fields). Without it, a wrapping parent whose other
+   children are `flex:1; min-width:<small>` pairs this wrapper into a half-width
+   slot, and the input collapses to one-pill-wide while the primary button
+   overlaps it. flex-basis:100% forces the wrapper onto its own line every time.
+   Harmless when the parent is not a flex container. */
+.iar-field {
+  flex-basis: 100%;
+}
+
+/* The control row itself. */
+.iar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The text input grows to consume the leftover width, but the min-width floor
+   stops it from ever being crushed below a usable size. When input(min) + gap +
+   action-group no longer fit, the action group wraps and the input — still
+   flex-growing — takes the whole first line. */
+.iar-row__input {
+  flex: 1 1 auto;
+  min-width: 140px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ui-text, #0f172a);
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border, #e2e8f0);
+  border-radius: var(--ui-radius-sm, 6px);
+}
+.iar-row__input:focus-visible {
+  outline: 2px solid var(--ui-focus-ring, rgb(37 99 235 / 0.4));
+  outline-offset: 1px;
+  border-color: var(--ui-accent, #2563eb);
+}
+
+/* The two buttons live in a nowrap group that is ONE flex child of the row.
+   This is what guarantees "buttons stay grouped": the only wrap seam is between
+   the input and this whole group, so the primary and secondary can never end up
+   on different lines. flex:0 0 auto keeps the group its natural width. */
+.iar-row__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+/* HIERARCHY BY STYLE, NOT PLACEMENT — both are real <button>s; the primary is
+   filled, the secondary is a ghost. Placement stays input → primary → secondary
+   regardless. */
+.iar-btn {
+  box-sizing: border-box;
+  padding: 8px 14px;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--ui-radius-sm, 6px);
+  border: 1px solid transparent;
+  transition: background var(--ui-dur-fast, 120ms) var(--ui-ease, ease),
+    border-color var(--ui-dur-fast, 120ms) var(--ui-ease, ease);
+}
+.iar-btn:focus-visible {
+  outline: 2px solid var(--ui-focus-ring, rgb(37 99 235 / 0.4));
+  outline-offset: 1px;
+}
+
+/* PRIMARY = filled accent (the commit action, glued to the input). */
+.iar-btn--primary {
+  color: var(--ui-on-accent, #ffffff);
+  background: var(--ui-accent, #2563eb);
+  border-color: var(--ui-accent, #2563eb);
+}
+.iar-btn--primary:hover {
+  background: var(--ui-accent-hover, #1d4ed8);
+  border-color: var(--ui-accent-hover, #1d4ed8);
+}
+
+/* SECONDARY = ghost (dismiss / cancel): transparent fill, hairline border. */
+.iar-btn--secondary {
+  color: var(--ui-text, #0f172a);
+  background: transparent;
+  border-color: var(--ui-border, #e2e8f0);
+}
+.iar-btn--secondary:hover {
+  background: var(--ui-surface-hover, #f1f5f9);
+}

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>注音大師</title>
+<link rel="stylesheet" href="page-width.css">
+<link rel="stylesheet" href="input-action-row.css">
+<link rel="stylesheet" href="modal-shell.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app" class="page-frame" data-page-type="reading">
+  <section id="screen-loading" class="screen active"><p class="muted">詞庫載入中…</p></section>
+
+  <section id="screen-setup" class="screen">
+    <div class="narrow">
+      <header class="masthead">
+        <span class="seal" aria-hidden="true">注</span>
+        <div>
+          <h1>注音大師</h1>
+          <p class="muted">輪流作答，時間到就扣一顆心，剩下最後一人獲勝。</p>
+        </div>
+      </header>
+
+      <fieldset>
+        <legend>朋友給你的分享碼</legend>
+        <div class="iar-row">
+          <input id="code-input" class="iar-row__input" type="text" autocomplete="off" spellcheck="false" aria-label="分享碼或連結" placeholder="貼上分享碼或連結，玩同一份題目">
+          <div class="iar-row__actions"><button id="btn-load-code" class="iar-btn iar-btn--primary" type="button">載入</button></div>
+        </div>
+        <p id="code-msg" class="help"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>模式</legend>
+        <div id="mode-options" class="choices"></div>
+        <p id="mode-help" class="help"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>參數</legend>
+        <div class="param">
+          <label for="time-range">每題時間</label>
+          <input id="time-range" type="range" min="3" max="60" step="1">
+          <output id="time-out"></output>
+        </div>
+        <div class="param">
+          <label for="lives-range">生命</label>
+          <input id="lives-range" type="range" min="1" max="10" step="1">
+          <output id="lives-out"></output>
+        </div>
+        <div class="param">
+          <span class="lbl" id="length-legend">詞長</span>
+          <div id="length-options" class="choices"></div>
+        </div>
+        <div class="param">
+          <span class="lbl">難度</span>
+          <div id="difficulty-options" class="choices"></div>
+        </div>
+        <div class="param">
+          <label for="seed-input">種子碼</label>
+          <input id="seed-input" class="seed" type="text" autocomplete="off" spellcheck="false" maxlength="24" placeholder="留白＝每次隨機">
+          <button id="btn-seed-random" class="ghost small" type="button">換一個</button>
+        </div>
+        <label class="check"><input id="opt-long" type="checkbox"> 長詞加分（字數越多分數越高，成語更高）</label>
+        <label class="check"><input id="opt-symbol" type="checkbox"> 注音符號集滿回血（37 個符號都用過，多一顆心）</label>
+        <label class="check"><input id="opt-overtime" type="checkbox"> 縮短計時（每過一題少 0.25 秒，最短 3 秒）</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>玩家（一人一行，一人也能練習）</legend>
+        <textarea id="names" rows="3" spellcheck="false">玩家 1</textarea>
+      </fieldset>
+
+      <button id="btn-start" class="primary" type="button">開始</button>
+    </div>
+  </section>
+
+  <section id="screen-game" class="screen">
+    <div id="players" class="players"></div>
+    <div class="game-grid">
+      <div class="stage">
+        <div class="round"><span id="round"></span><span class="seed-tag">種子 <b id="seed-tag"></b></span></div>
+        <div id="bomb" class="bomb"></div>
+        <div id="turn-name" class="turn-name"></div>
+        <div id="prompt" class="prompt"></div>
+        <p id="prompt-help" class="help"></p>
+        <div class="iar-row answer-row">
+          <input id="answer" class="iar-row__input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="答案" placeholder="輸入答案後按 Enter">
+          <div class="iar-row__actions">
+            <button id="btn-submit" class="iar-btn iar-btn--primary" type="button">送出</button>
+          </div>
+        </div>
+        <p id="feedback" class="feedback" aria-live="polite"></p>
+        <div id="keyboard" class="keyboard"></div>
+      </div>
+      <aside class="used">
+        <h3>本局已用</h3>
+        <div id="used-words"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="screen-over" class="screen">
+    <div class="narrow">
+      <h2>結算</h2>
+      <div id="ranking"></div>
+      <div id="challenge" class="challenge" hidden></div>
+      <section class="share">
+        <h3 class="sub">分享這份題目</h3>
+        <p class="help">朋友貼上分享碼或打開連結，會玩到一模一樣的題目，並看到你的成績。</p>
+        <div class="iar-row">
+          <input id="share-code" class="iar-row__input" type="text" readonly aria-label="分享連結">
+          <div class="iar-row__actions">
+            <button id="btn-copy" class="iar-btn iar-btn--primary" type="button">複製連結</button>
+            <button id="btn-share" class="iar-btn iar-btn--secondary" type="button" hidden>分享</button>
+          </div>
+        </div>
+        <p id="share-msg" class="help"></p>
+      </section>
+      <h3 class="sub">逐題回顧</h3>
+      <div id="review"></div>
+      <div class="actions">
+        <button id="btn-retry" class="primary" type="button">同一份題目再挑戰</button>
+        <button id="btn-replay" class="ghost" type="button">換一份題目再來</button>
+        <button id="btn-again" class="ghost" type="button">回設定</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="ui-modal-overlay" id="over-modal" hidden>
+  <div class="ui-modal" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <header class="ui-modal__header"><h3 class="ui-modal__title" id="over-title">遊戲結束</h3></header>
+    <div class="ui-modal__body" id="over-body"></div>
+    <footer class="ui-modal__footer"><button id="btn-over-ok" class="primary" type="button" autofocus>看結算</button></footer>
+  </div>
+</div>
+
+<footer>
+  詞庫：中華民國教育部《重編國語辭典修訂本》《成語典》，採
+  <a href="https://language.moe.gov.tw/001/Upload/Files/site_content/M0001/respub/index.html" target="_blank" rel="noopener">創用CC 姓名標示-禁止改作 3.0 臺灣</a> 授權。
+</footer>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

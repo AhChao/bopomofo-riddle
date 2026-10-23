@@ -1,0 +1,22 @@
+/*
+ * page-width-by-page-type — one content-width cap per page TYPE.
+ * The frame is the single centered column every routed page renders into. The page declares its type
+ * (route metadata → data-page-type); the cap follows the type, never the individual component.
+ *   reading  forms, prose, detail pages: a label + input row stays scannable, so the cap stays modest.
+ *   list     tables, boards, many-column admin pages: extra width turns horizontal scrolling into visible columns.
+ * Caps are custom properties so an app can tune the two numbers without touching the rule.
+ */
+.page-frame {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;            /* a wide child (table) scrolls inside, it never stretches the frame */
+  margin-inline: auto;     /* the free space is split evenly; it only exists when the container is wider than the cap */
+}
+.page-frame[data-page-type="reading"] { max-width: var(--page-reading-max, 1150px); }
+.page-frame[data-page-type="list"]    { max-width: var(--page-list-max, 1600px); }
+
+/* A data table inside a list page: width:100% with nowrap cells, so every extra pixel of container becomes column
+   room until the table reaches its natural width (after that it only stretches). */
+.page-frame[data-page-type="list"] table { width: 100%; }
+.page-frame[data-page-type="list"] td,
+.page-frame[data-page-type="list"] th { white-space: nowrap; }
