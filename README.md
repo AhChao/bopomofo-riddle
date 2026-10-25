@@ -19,6 +19,7 @@
 - web/js/core.js：提示池、驗證、計分，純函式，之後原封搬進 Durable Object
 - web/js/game.js：炸彈回合狀態機，時間由呼叫端傳入
 - web/js/rng.js、share.js：種子化亂數、分享碼編解碼
+- web/js/share-ui.js：分享連結產生與複製
 - web/js/keyboard.js：注音符號鍵盤
 - web/js/ui.js、main.js：畫面與輸入
 - web/js/ime-safe-submit.js、modal-shell.js 與對應 css：複製自 stv-prefer-ui-template
