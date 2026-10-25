@@ -46,6 +46,8 @@ test('隨機種子碼 6 碼、不含易混字元', () => {
   for (let i = 0; i < 50; i++) assert.match(randomSeed(), /^[A-HJ-NP-Z2-9]{6}$/);
   assert.equal(normalizeSeed(' a b '), 'AB');
   assert.equal(normalizeSeed('a;b'), null);
+  assert.equal(normalizeSeed('ｂｕｇ１２'), 'BUG12');
+  assert.equal(normalizeSeed('風紀 ａ'), '風紀A');
 });
 
 // 固定題序：用小型詞庫，不依賴 words.json

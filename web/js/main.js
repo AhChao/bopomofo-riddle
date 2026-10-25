@@ -2,7 +2,8 @@ import { buildIndex, MODES, DIFFICULTY } from './core.js';
 import { Game } from './game.js';
 import { bindEnterSubmit } from './ime-safe-submit.js';
 import { renderKeyboard, celebrate } from './keyboard.js';
-import { randomSeed, normalizeSeed, encodeShare, parseShareInput, shareUrl, dictSig } from './share.js';
+import { randomSeed, normalizeSeed, parseShareInput, dictSig } from './share.js';
+import { linkFor, copyText, copyWithLabel } from './share-ui.js';
 import { initModalShell } from './modal-shell.js';
 import {
   show, renderChoices, renderPlayers, renderPrompt, renderUsed, renderRanking, renderSummary, renderReview,
@@ -25,7 +26,8 @@ const PROMPT_HELP = {
 const settings = {
   mode: 'initials', length: 2, difficulty: 'normal', lives: 3, turnSeconds: 10, longBonus: true, overtime: false, symbolBonus: true,
 };
-let challenge = null; // 從分享碼載入的挑戰：{ seed, settings, result }
+let challenge = null; // 從分享碼載入的挑戰：{ seed, settings, result }；有值時設定與種子鎖定，確保雙方條件相同
+let mine = null; // 載入挑戰前自己的設定；挑戰期間不寫進本機偏好，取消挑戰時還原
 let played = null; // 這一局開始時的設定快照與種子，分享碼由它產生
 let index = null;
 let game = null;
@@ -41,7 +43,7 @@ const overModal = initModalShell($('over-modal'), {
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, Number(n) || lo));
 
 function saveSettings() {
-  try { localStorage.setItem('bopomofo-master', JSON.stringify({ ...settings, names: $('names').value })); } catch {}
+  try { localStorage.setItem('bopomofo-master', JSON.stringify({ ...(challenge ? mine : settings), names: $('names').value })); } catch {}
 }
 
 function loadSettings() {
@@ -60,21 +62,22 @@ function loadSettings() {
 }
 
 function renderSetup() {
+  const locked = !!challenge;
   renderChoices($('mode-options'), Object.entries(MODES).map(([k, v]) => [k, v.label]), settings.mode, (v) => {
     settings.mode = v;
     if (!MODES[v].lengths.includes(settings.length)) settings.length = MODES[v].lengths[0];
     renderSetup();
-  });
+  }, locked);
   $('mode-help').textContent = MODE_HELP[settings.mode];
   $('length-legend').textContent = MODES[settings.mode].lengthLabel;
   renderChoices($('length-options'), MODES[settings.mode].lengths.map((n) => [n, `${n} 字`]), settings.length, (v) => {
     settings.length = Number(v);
     renderSetup();
-  });
+  }, locked);
   renderChoices($('difficulty-options'), Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label]), settings.difficulty, (v) => {
     settings.difficulty = v;
     renderSetup();
-  });
+  }, locked);
   $('time-range').value = settings.turnSeconds;
   $('time-out').textContent = `${settings.turnSeconds} 秒`;
   $('lives-range').value = settings.lives;
@@ -82,21 +85,45 @@ function renderSetup() {
   $('opt-long').checked = settings.longBonus;
   $('opt-overtime').checked = settings.overtime;
   $('opt-symbol').checked = settings.symbolBonus;
+  for (const id of ['time-range', 'lives-range', 'opt-long', 'opt-overtime', 'opt-symbol', 'btn-seed-random']) $(id).disabled = locked;
+  $('seed-input').disabled = locked;
+  $('lock-box').hidden = !locked;
+  updateSetupLink();
+  if (locked) $('lock-text').textContent = `挑戰模式：設定與種子碼已鎖定，和朋友一樣（每題 ${settings.turnSeconds} 秒、${settings.lives} 顆心${settings.overtime ? '、縮短計時' : ''}${settings.longBonus ? '' : '、不計長詞加分'}${settings.symbolBonus ? '' : '、不能集符號回血'}）。`;
 }
 
-$('time-range').addEventListener('input', (e) => { settings.turnSeconds = Number(e.target.value); $('time-out').textContent = `${settings.turnSeconds} 秒`; });
-$('lives-range').addEventListener('input', (e) => { settings.lives = Number(e.target.value); $('lives-out').textContent = `${settings.lives} 顆`; });
-$('opt-long').addEventListener('change', (e) => { settings.longBonus = e.target.checked; });
-$('opt-overtime').addEventListener('change', (e) => { settings.overtime = e.target.checked; });
-$('opt-symbol').addEventListener('change', (e) => { settings.symbolBonus = e.target.checked; });
-$('btn-seed-random').onclick = () => { $('seed-input').value = randomSeed(); };
+// 設定頁的分享連結：目前的設定加種子，開局前就能複製給朋友
+function updateSetupLink() {
+  if (!index) return;
+  const raw = $('seed-input').value.trim();
+  const seed = normalizeSeed(raw);
+  $('seed-msg').textContent = raw && !seed ? '種子碼只能用英文、數字或中文，最多 24 個字。' : '';
+  $('setup-link').value = seed ? linkFor(index, settings, seed) : '';
+  $('setup-link').placeholder = raw ? '' : '種子碼留白：按「複製連結」時才會定下一組題目';
+  $('btn-setup-copy').disabled = !!raw && !seed;
+}
+
+$('time-range').addEventListener('input', (e) => { settings.turnSeconds = Number(e.target.value); $('time-out').textContent = `${settings.turnSeconds} 秒`; updateSetupLink(); });
+$('lives-range').addEventListener('input', (e) => { settings.lives = Number(e.target.value); $('lives-out').textContent = `${settings.lives} 顆`; updateSetupLink(); });
+$('opt-long').addEventListener('change', (e) => { settings.longBonus = e.target.checked; updateSetupLink(); });
+$('opt-overtime').addEventListener('change', (e) => { settings.overtime = e.target.checked; updateSetupLink(); });
+$('opt-symbol').addEventListener('change', (e) => { settings.symbolBonus = e.target.checked; updateSetupLink(); });
+$('btn-seed-random').onclick = () => { $('seed-input').value = randomSeed(); updateSetupLink(); };
+$('seed-input').addEventListener('input', updateSetupLink);
+$('btn-setup-copy').onclick = () => {
+  // 留白時在分享的當下定型：先產生種子填進欄位，之後自己開局也是這一組
+  if (!$('seed-input').value.trim()) { $('seed-input').value = randomSeed(); updateSetupLink(); }
+  copyWithLabel($('btn-setup-copy'), $('setup-link').value);
+};
 
 function startGame() {
   const names = $('names').value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 8);
   if (!names.length) { $('names').focus(); return; }
-  const typed = $('seed-input').value.trim();
+  const typed = challenge ? challenge.seed : $('seed-input').value.trim();
   const seed = typed ? normalizeSeed(typed) : randomSeed();
-  if (!seed) { $('seed-input').focus(); $('code-msg').textContent = '種子碼只能用英文、數字或中文，最多 24 個字'; return; }
+  if (!seed) { $('seed-input').focus(); updateSetupLink(); return; }
+  if (!challenge) $('seed-input').value = seed;
+  if (challenge) Object.assign(settings, challenge.settings);
   saveSettings();
   played = { seed, settings: { ...settings } };
   game = new Game({
@@ -192,21 +219,28 @@ bindEnterSubmit($('answer'), submit);
 $('btn-submit').onclick = submit;
 $('btn-start').onclick = startGame;
 $('btn-over-ok').onclick = () => { overModal.close(); show('over'); };
-$('btn-replay').onclick = () => { $('seed-input').value = ''; startGame(); };
-$('btn-again').onclick = () => { show('setup'); };
+$('btn-replay').onclick = () => { cancelChallenge(); startGame(); };
+$('btn-again').onclick = () => {
+  // 回設定預設留白（每次隨機）；自己改過的種子保留
+  if (!challenge && normalizeSeed($('seed-input').value) === played?.seed) $('seed-input').value = '';
+  renderSetup();
+  show('setup');
+};
+$('btn-game-copy').onclick = () => copyWithLabel($('btn-game-copy'), linkFor(index, played.settings, played.seed));
+$('btn-over-copy').onclick = () => copyWithLabel($('btn-over-copy'), $('share-code').value);
 
 // ---- 分享：產生碼、複製、載入朋友的碼 ----
 function renderShare() {
   const top = game.summary()[0];
   const result = { score: top.score, correct: top.correct, rounds: game.round - 1 };
-  const code = encodeShare({ settings: played.settings, seed: played.seed, sig: dictSig(index), result });
-  $('share-code').value = shareUrl(code);
+  $('share-code').value = linkFor(index, played.settings, played.seed, result);
   $('share-msg').textContent = `種子碼 ${played.seed}`;
   $('btn-share').hidden = typeof navigator.share !== 'function';
   const box = $('challenge');
   const s = played.settings;
-  const same = challenge && challenge.result && challenge.seed === played.seed && challenge.settings.mode === s.mode
-    && challenge.settings.length === s.length && challenge.settings.difficulty === s.difficulty;
+  // 設定完全相同（含每題時間、生命、開關）才比分數，否則不公平
+  const KEYS = ['mode', 'length', 'difficulty', 'turnSeconds', 'lives', 'longBonus', 'overtime', 'symbolBonus'];
+  const same = challenge && challenge.result && challenge.seed === played.seed && KEYS.every((k) => challenge.settings[k] === s[k]);
   box.hidden = !same;
   if (same) {
     const f = challenge.result;
@@ -216,13 +250,6 @@ function renderShare() {
     b.textContent = verdict;
     box.append(b, `　朋友 ${f.score} 分、答對 ${f.correct} 題；你 ${top.score} 分、答對 ${top.correct} 題。`);
   }
-}
-
-async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); return true; } catch {}
-  const t = $('share-code');
-  t.select();
-  try { return document.execCommand('copy'); } catch { return false; }
 }
 
 $('btn-copy').onclick = async () => {
@@ -236,21 +263,36 @@ $('btn-share').onclick = () => {
 function loadCode(text) {
   const d = parseShareInput(text);
   if (!d) { $('code-msg').textContent = '這個分享碼無法辨識，請確認有完整貼上。'; return false; }
+  if (!challenge) mine = { ...settings };
   Object.assign(settings, d.settings);
   $('seed-input').value = d.seed;
-  challenge = { seed: d.seed, settings: d.settings, result: d.result };
+  challenge = { seed: d.seed, settings: { ...d.settings }, result: d.result };
   renderSetup();
   const m = MODES[d.settings.mode];
   let msg = `已載入：${m.label} ${d.settings.length} 字，種子 ${d.seed}。`;
   if (d.result) msg += `朋友得 ${d.result.score} 分、答對 ${d.result.correct} 題。`;
-  msg += '按「開始」玩同一份題目。';
+  msg += '按「開始」玩同一份題目，設定已鎖定。';
   if (d.sig !== '-' && d.sig !== dictSig(index)) msg += '（對方的詞庫版本和你不同，題目可能不完全一樣。）';
   $('code-msg').textContent = msg;
   return true;
 }
 $('btn-load-code').onclick = () => { if (loadCode($('code-input').value)) $('code-input').value = ''; };
 bindEnterSubmit($('code-input'), () => $('btn-load-code').click());
-$('btn-retry').onclick = () => { $('seed-input').value = played.seed; startGame(); };
+function cancelChallenge() {
+  challenge = null;
+  if (mine) { Object.assign(settings, mine); mine = null; }
+  $('seed-input').value = '';
+  $('code-msg').textContent = '';
+  renderSetup();
+}
+$('btn-unlock').onclick = cancelChallenge;
+// 同一份題目再挑戰：設定與種子都回到這一局開始時的樣子，不能中途改條件
+$('btn-retry').onclick = () => {
+  Object.assign(settings, played.settings);
+  $('seed-input').value = played.seed;
+  renderSetup();
+  startGame();
+};
 
 async function boot() {
   loadSettings();
@@ -259,7 +301,7 @@ async function boot() {
   index = buildIndex((await res.json()).words);
   show('setup');
   const c = new URLSearchParams(location.search).get('c');
-  if (c) loadCode(c);
+  if (c) loadCode(c); else renderSetup();
 }
 boot().catch(() => {
   document.querySelector('#screen-loading p').textContent = '詞庫載入失敗，請重新整理。';

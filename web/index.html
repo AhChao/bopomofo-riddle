@@ -32,6 +32,11 @@
         <p id="code-msg" class="help"></p>
       </fieldset>
 
+      <div id="lock-box" class="lock-box" hidden>
+        <span id="lock-text"></span>
+        <button id="btn-unlock" class="ghost small" type="button">取消挑戰，自由設定</button>
+      </div>
+
       <fieldset>
         <legend>模式</legend>
         <div id="mode-options" class="choices"></div>
@@ -63,6 +68,12 @@
           <input id="seed-input" class="seed" type="text" autocomplete="off" spellcheck="false" maxlength="24" placeholder="留白＝每次隨機">
           <button id="btn-seed-random" class="ghost small" type="button">換一個</button>
         </div>
+        <p id="seed-msg" class="help warn-text"></p>
+        <div class="param">
+          <label for="setup-link">分享連結</label>
+          <input id="setup-link" class="seed link" type="text" readonly aria-label="這份設定與題目的分享連結">
+          <button id="btn-setup-copy" class="ghost small" type="button">複製連結</button>
+        </div>
         <label class="check"><input id="opt-long" type="checkbox"> 長詞加分（字數越多分數越高，成語更高）</label>
         <label class="check"><input id="opt-symbol" type="checkbox"> 注音符號集滿回血（37 個符號都用過，多一顆心）</label>
         <label class="check"><input id="opt-overtime" type="checkbox"> 縮短計時（每過一題少 0.25 秒，最短 3 秒）</label>
@@ -81,7 +92,7 @@
     <div id="players" class="players"></div>
     <div class="game-grid">
       <div class="stage">
-        <div class="round"><span id="round"></span><span class="seed-tag">種子 <b id="seed-tag"></b></span></div>
+        <div class="round"><span id="round"></span><span class="seed-tag">種子 <b id="seed-tag"></b></span><button id="btn-game-copy" class="ghost small" type="button">複製連結</button></div>
         <div id="bomb" class="bomb"></div>
         <div id="turn-name" class="turn-name"></div>
         <div id="prompt" class="prompt"></div>
@@ -134,7 +145,7 @@
   <div class="ui-modal" role="dialog" aria-modal="true" aria-labelledby="over-title">
     <header class="ui-modal__header"><h3 class="ui-modal__title" id="over-title">遊戲結束</h3></header>
     <div class="ui-modal__body" id="over-body"></div>
-    <footer class="ui-modal__footer"><button id="btn-over-ok" class="primary" type="button" autofocus>看結算</button></footer>
+    <footer class="ui-modal__footer"><button id="btn-over-copy" class="ghost" type="button">複製挑戰連結</button><button id="btn-over-ok" class="primary" type="button" autofocus>看結算</button></footer>
   </div>
 </div>
 

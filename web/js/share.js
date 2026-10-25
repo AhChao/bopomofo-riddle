@@ -35,9 +35,9 @@ export function randomSeed(rng = Math.random) {
   return Array.from({ length: 6 }, () => SEED_ALPHABET[Math.floor(rng() * SEED_ALPHABET.length)]).join('');
 }
 
-// 種子碼只收英數與中文，最長 24 字；不合法回 null
+// 種子碼只收英數與中文，最長 24 字；不合法回 null。全形英數（中文輸入法常見）先轉半形
 export function normalizeSeed(raw) {
-  const s = String(raw ?? '').trim().replace(/\s+/g, '');
+  const s = String(raw ?? '').normalize('NFKC').trim().replace(/\s+/g, '');
   return /^[A-Za-z0-9一-鿿]{1,24}$/.test(s) ? s.toUpperCase() : null;
 }
 

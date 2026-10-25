@@ -20,13 +20,14 @@ export function show(name) {
   $(`screen-${name}`).classList.add('active');
 }
 
-export function renderChoices(el, options, selected, onPick) {
+export function renderChoices(el, options, selected, onPick, disabled = false) {
   el.innerHTML = '';
   for (const [value, label] of options) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'choice' + (String(value) === String(selected) ? ' on' : '');
     b.textContent = label;
+    b.disabled = disabled;
     b.onclick = () => onPick(value);
     el.append(b);
   }

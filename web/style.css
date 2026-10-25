@@ -226,3 +226,15 @@ button.ghost.small { padding: 5px 12px; font-size: 14px; }
 @keyframes complete { 0%, 100% { background: transparent; } 20%, 60% { background: var(--tint); } }
 @media (max-width: 480px) { .kb-key { width: 24px; height: 26px; font-size: 15px; } }
 @media (prefers-reduced-motion: reduce) { .kb-key.fresh, .keyboard.complete, .bomb.boom, .bomb.hot { animation: none; } }
+
+/* 挑戰模式：設定隨分享碼鎖定 */
+.lock-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 10px 14px; background: var(--tint); border-left: 4px solid var(--vermilion); font-size: 15px; }
+.choice:disabled, .param input:disabled, .check input:disabled, .seed:disabled { opacity: .55; cursor: not-allowed; }
+.choice:disabled:hover { background: transparent; }
+.choice.on:disabled:hover { background: var(--ink); }
+
+/* 設定頁的分享連結、種子錯誤、對局中與彈窗的複製鈕 */
+.seed.link { text-transform: none; letter-spacing: 0; font-size: 13px; min-width: 0; }
+.warn-text { color: var(--vermilion); }
+.round .ghost.small { margin-left: 10px; padding: 2px 10px; font-size: 13px; }
+.ui-modal__footer { flex-wrap: wrap; }
