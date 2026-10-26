@@ -1,5 +1,6 @@
 // 畫面小零件：只負責把資料畫出來，不含規則。圖示一律 inline SVG，顏色走 CSS 變數。
-import { promptView, readingOf, prefixReading } from './core.js';
+import { promptView, promptCells, readingOf, prefixReading } from './core.js';
+import { dictUrl } from './dict-link.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,7 +35,8 @@ export function renderChoices(el, options, selected, onPick, disabled = false) {
 }
 
 // 一個詞連同逐字注音：<ruby>字<rt>ㄗˋ</rt></ruby>
-export function wordNode(index, word) {
+// link: true 時整個詞包成教育部辭典的連結（只用在結算相關畫面，對局中不加，免得誤點離開）
+export function wordNode(index, word, { link = false } = {}) {
   const wrap = document.createElement('span');
   wrap.className = 'w';
   const syl = readingOf(index, word);
@@ -46,7 +48,16 @@ export function wordNode(index, word) {
     r.append(rt);
     wrap.append(r);
   });
-  return wrap;
+  const entry = link ? index.byWord.get(word) : null;
+  if (!entry) return wrap;
+  const a = document.createElement('a');
+  a.className = 'dict-link';
+  a.href = dictUrl(word, entry.idiom);
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  a.title = '在教育部辭典查看';
+  a.append(wrap);
+  return a;
 }
 
 export function renderPlayers(game, maxLives) {
@@ -65,13 +76,13 @@ export function renderPlayers(game, maxLives) {
 export function renderPrompt(game) {
   const el = $('prompt');
   el.innerHTML = '';
-  const symbols = promptView(game.mode, game.prompt);
+  const cells = promptCells(game.mode, game.prompt);
   const TONE_NAME = { 1: '一聲', 2: '二聲', 3: '三聲', 4: '四聲', 5: '輕聲' };
   const zy = game.mode === 'prefix' ? prefixReading(game.index, game.pool, game.prompt)
     : game.mode === 'tones' ? [...game.prompt].map((n) => TONE_NAME[n]) : null;
-  symbols.forEach((s, i) => {
+  cells.forEach((cell, i) => {
     const c = document.createElement('div');
-    c.className = 'cell' + (zy ? ' has-zy' : '');
+    c.className = 'cell' + (zy ? ' has-zy' : '') + (cell.given ? ' given' : '');
     if (zy) {
       const z = document.createElement('span');
       z.className = 'zy';
@@ -80,7 +91,7 @@ export function renderPrompt(game) {
     }
     const ch = document.createElement('span');
     ch.className = 'ch';
-    ch.textContent = s;
+    ch.textContent = cell.text;
     c.append(ch);
     el.append(c);
   });
@@ -103,7 +114,7 @@ export function renderRanking(game) {
     d.querySelector('.nm').textContent = p.name;
     d.querySelector('.sc').textContent = `${p.score} 分`;
     const words = d.querySelector('.words');
-    p.words.forEach((w) => words.append(wordNode(game.index, w)));
+    p.words.forEach((w) => words.append(wordNode(game.index, w, { link: true })));
     el.append(d);
   });
 }
@@ -141,7 +152,7 @@ export function promptText(mode, prompt) {
 
 function hintNodes(game, words) {
   const span = el('span');
-  words.forEach((w, i) => { if (i) span.append('、'); span.append(wordNode(game.index, w)); });
+  words.forEach((w, i) => { if (i) span.append('、'); span.append(wordNode(game.index, w, { link: true })); });
   return span;
 }
 
@@ -164,7 +175,7 @@ export function renderSummary(game) {
     const stat = (label, value) => { const sp = el('span'); sp.append(`${label} `); sp.append(el('b', '', String(value))); return sp; };
     stats.append(stat('得分', s.score), stat('答對', `${s.correct} 題`), stat('時間到', `${s.timeouts} 題`),
       stat('答錯輸入', `${s.wrongTries} 次`), stat('最高連對', s.bestStreak));
-    if (s.best) { const sp = el('span'); sp.append('最佳 '); sp.append(wordNode(game.index, s.best.w)); stats.append(sp); }
+    if (s.best) { const sp = el('span'); sp.append('最佳 '); sp.append(wordNode(game.index, s.best.w, { link: true })); stats.append(sp); }
     box.append(stats);
     body.append(box);
   }
@@ -196,7 +207,7 @@ export function renderReview(game) {
     const row = el('div', 'sum-row');
     row.append(el('span', 'n', `第 ${e.round} 題`), el('span', 'pr', promptText(game.mode, e.prompt)), `${e.player}　`);
     if (e.outcome === 'ok') {
-      row.append(wordNode(game.index, e.word), `　+${e.gain} 分${e.idiom ? '（成語）' : ''}`);
+      row.append(wordNode(game.index, e.word, { link: true }), `　+${e.gain} 分${e.idiom ? '（成語）' : ''}`);
     } else {
       row.append(el('span', 'bad', '時間到'), '　範例：', hintNodes(game, e.hint));
     }

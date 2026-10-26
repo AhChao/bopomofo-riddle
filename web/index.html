@@ -59,6 +59,10 @@
           <span class="lbl" id="length-legend">詞長</span>
           <div id="length-options" class="choices"></div>
         </div>
+        <div class="param" id="hint-param" hidden>
+          <span class="lbl">已知字數</span>
+          <div id="hint-options" class="choices"></div>
+        </div>
         <div class="param">
           <span class="lbl">難度</span>
           <div id="difficulty-options" class="choices"></div>
@@ -92,7 +96,7 @@
     <div id="players" class="players"></div>
     <div class="game-grid">
       <div class="stage">
-        <div class="round"><span id="round"></span><span class="seed-tag">種子 <b id="seed-tag"></b></span><button id="btn-game-copy" class="ghost small" type="button">複製連結</button></div>
+        <div class="round"><span id="round"></span><span class="seed-tag">種子 <b id="seed-tag"></b></span><button id="btn-game-copy" class="ghost small" type="button">複製連結</button><button id="btn-leave" class="ghost small" type="button">離開</button></div>
         <div id="bomb" class="bomb"></div>
         <div id="turn-name" class="turn-name"></div>
         <div id="prompt" class="prompt"></div>
@@ -146,6 +150,14 @@
     <header class="ui-modal__header"><h3 class="ui-modal__title" id="over-title">遊戲結束</h3></header>
     <div class="ui-modal__body" id="over-body"></div>
     <footer class="ui-modal__footer"><button id="btn-over-copy" class="ghost" type="button">複製挑戰連結</button><button id="btn-over-ok" class="primary" type="button" autofocus>看結算</button></footer>
+  </div>
+</div>
+
+<div class="ui-modal-overlay" id="leave-modal" hidden>
+  <div class="ui-modal leave-modal" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+    <header class="ui-modal__header"><h3 class="ui-modal__title" id="leave-title">離開這一局？</h3></header>
+    <div class="ui-modal__body"><p>這一局不會計入結算。</p></div>
+    <footer class="ui-modal__footer"><button id="btn-leave-confirm" class="ghost" type="button">離開</button><button id="btn-leave-stay" class="primary" type="button" autofocus>繼續玩</button></footer>
   </div>
 </div>
 

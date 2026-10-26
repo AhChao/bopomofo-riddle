@@ -219,8 +219,7 @@ const setRangeOn = (pg, sel, v) => pg.$eval(sel, (el, val) => { el.value = val; 
   check(prefs.turnSeconds === 7, `載入挑戰不會把對方的設定寫進自己的偏好（${prefs.turnSeconds}）`);
   await g.reload();
   await g.waitForSelector('#screen-setup.active');
-  await g.click('#btn-unlock');
-  check((await g.inputValue('#time-range')) === '7', '取消挑戰後回到自己原本的設定');
+  check(!(await g.isVisible('#lock-box')) && (await g.inputValue('#time-range')) === '7', '重新整理後挑戰不再鎖定，回到自己原本的設定');
   await g.close();
   await s.close();
   await ctx.close();
@@ -236,6 +235,34 @@ await p3.fill('#code-input', code1);
 await p3.click('#btn-load-code');
 check(/已載入/.test(await p3.textContent('#code-msg')), '在輸入框貼上連結也能載入');
 await p3.close();
+
+// 注音縮寫已知字數：4 字給 2 字，提示有 2 個原字格與 2 個注音格；答對一題確認提示鍵與池一致
+{
+  const hp = await browser.newPage({ viewport: { width: 1100, height: 800 } });
+  const hpErrors = [];
+  hp.on('pageerror', (e) => hpErrors.push(String(e)));
+  await hp.goto(BASE);
+  await hp.waitForSelector('#screen-setup.active');
+  await hp.click('#mode-options button:text-is("注音縮寫")');
+  await hp.click('#length-options button:text-is("4 字")');
+  await hp.click('#hint-options button:text-is("給 2 字")');
+  await hp.click('#difficulty-options button:text-is("簡單")');
+  await setRangeOn(hp, '#time-range', 30);
+  await setRangeOn(hp, '#lives-range', 2);
+  await hp.fill('#names', '甲\n乙');
+  await hp.click('#btn-start');
+  await hp.waitForSelector('#screen-game.active');
+  const givenN = await hp.$$eval('#prompt .cell.given', (els) => els.length);
+  const symbolN = await hp.$$eval('#prompt .cell:not(.given)', (els) => els.length);
+  check(givenN === 2 && symbolN === 2, `已知字數 2：提示有 2 個原字格與 2 個注音格（${givenN}/${symbolN}）`);
+  const hKey = (await hp.$$eval('#prompt .cell .ch', (els) => els.map((e) => e.textContent))).join('');
+  const hAns = buildPool(index, 'initials', 4, 1, 2).get(hKey)?.[0] ?? '';
+  await hp.fill('#answer', hAns);
+  await hp.press('#answer', 'Enter');
+  check((await hp.getAttribute('#feedback', 'class')).includes('ok'), `已知字數 2：提示「${hKey}」答對（${hAns}）`);
+  check(hpErrors.length === 0, `已知字數：頁面沒有錯誤${hpErrors.length ? '：' + hpErrors.join(' | ') : ''}`);
+  await hp.close();
+}
 
 // 注音符號鍵盤：答對後亮起
 {
@@ -259,6 +286,103 @@ for (const [w, h, name] of [[390, 844, 'mobile'], [1600, 900, 'wide']]) {
   check(m.inputBottom <= h, `${name}：作答輸入框在第一屏內（${Math.round(m.inputBottom)}/${h}）`);
   if (name === 'wide') check(m.stage + m.used > 900, `${name}：寬螢幕兩欄展開（舞台 ${Math.round(m.stage)} + 已用 ${Math.round(m.used)}）`);
   await shot(`layout-${name}`);
+}
+
+// 結算詞連結、挑戰只在進站當下生效、對局中離開：各開新分頁，不接續上面的對局
+const track = (pg) => {
+  pg.on('pageerror', (e) => errors.push(String(e)));
+  pg.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  return pg;
+};
+const newTab = async () => track(await browser.newPage({ viewport: { width: 1100, height: 800 } }));
+const setRangeIn = (pg, sel, v) => pg.$eval(sel, (el, val) => { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+
+// 結算詞連結：單人局輸一次，結算彈窗與結算頁的詞都要能點進教育部辭典，遊戲中畫面不能有連結
+{
+  const a = await newTab();
+  await a.goto(BASE);
+  await a.waitForSelector('#screen-setup.active');
+  await a.click('#mode-options button:text-is("注音縮寫")');
+  await a.click('#length-options button:text-is("2 字")');
+  await setRangeIn(a, '#time-range', 5);
+  await setRangeIn(a, '#lives-range', 1);
+  await a.fill('#names', '獨玩');
+  await a.click('#btn-start');
+  await a.waitForSelector('#screen-game.active');
+  const key = (await a.$$eval('#prompt .cell', (els) => els.map((e) => e.textContent))).join('');
+  await a.fill('#answer', buildPool(index, 'initials', 2, 1).get(key)[0]);
+  await a.press('#answer', 'Enter');
+  await a.waitForSelector('#used-words .w');
+  check((await a.$$('#screen-game a')).length === 0, '對局中畫面沒有詞連結（避免誤點離開遊戲）');
+  await a.waitForSelector('#over-modal:not([hidden])', { timeout: 60000 });
+  const modalLinks = await a.$$eval('#over-body a', (els) => els.map((e) => ({ href: e.href, target: e.target, rel: e.rel })));
+  check(modalLinks.length > 0 && modalLinks.every((l) => /moe\.edu\.tw/.test(l.href) && l.target === '_blank' && l.rel.includes('noopener')),
+    `結算彈窗的詞連到教育部辭典、新分頁開啟（${modalLinks.length} 個）`);
+  await a.click('#btn-over-ok');
+  await a.waitForSelector('#screen-over.active');
+  check((await a.$$('#review a')).length > 0 && (await a.$$('#ranking a')).length > 0, '結算頁的逐題回顧與排名都有詞連結');
+  await a.close();
+}
+
+// 挑戰只在進站當下生效：網址拿掉 c=，玩完回設定後解鎖、種子清空
+{
+  const b = await newTab();
+  await b.goto(code1);
+  await b.waitForSelector('#screen-setup.active');
+  await b.waitForFunction(() => /已載入/.test(document.getElementById('code-msg').textContent));
+  check(!/[?&]c=/.test(b.url()), `挑戰連結進站後網址已不含 c=（${b.url()}）`);
+  await b.click('#btn-start');
+  await b.waitForSelector('#screen-game.active');
+  await b.waitForSelector('#over-modal:not([hidden])', { timeout: 60000 });
+  await b.click('#btn-over-ok');
+  await b.waitForSelector('#screen-over.active');
+  await b.click('#btn-again');
+  await b.waitForSelector('#screen-setup.active');
+  const after = await b.evaluate(() => ({
+    lockHidden: document.getElementById('lock-box').hidden,
+    timeDisabled: document.getElementById('time-range').disabled,
+    seedDisabled: document.getElementById('seed-input').disabled,
+    seed: document.getElementById('seed-input').value,
+  }));
+  check(after.lockHidden && !after.timeDisabled && !after.seedDisabled && after.seed === '',
+    '玩完回設定：鎖定框隱藏、控制項可用、種子碼清空');
+  await b.close();
+}
+
+// 對局中離開：「繼續玩」留在對局；「離開」回設定頁，不產生結算
+{
+  const l = await newTab();
+  await l.goto(BASE);
+  await l.waitForSelector('#screen-setup.active');
+  await setRangeIn(l, '#time-range', 60);
+  await l.fill('#names', '獨玩');
+  await l.click('#btn-start');
+  await l.waitForSelector('#screen-game.active');
+  await l.click('#btn-leave');
+  await l.waitForSelector('#leave-modal:not([hidden])');
+  check(await l.isVisible('#btn-leave-confirm'), '離開確認彈窗真的看得到');
+  check(await l.evaluate(() => document.activeElement && document.activeElement.id === 'btn-leave-stay'), '離開確認預設焦點在「繼續玩」');
+  await l.click('#btn-leave-stay');
+  await l.waitForFunction(() => document.getElementById('leave-modal').hidden);
+  check(await l.isVisible('#screen-game'), '按「繼續玩」仍在對局');
+  await l.click('#btn-leave');
+  await l.waitForSelector('#leave-modal:not([hidden])');
+  await l.click('#btn-leave-confirm');
+  await l.waitForSelector('#screen-setup.active');
+  const left = await l.evaluate(() => ({
+    overOpen: !document.getElementById('over-modal').hidden,
+    resultActive: document.getElementById('screen-over').classList.contains('active'),
+  }));
+  check(!left.overOpen && !left.resultActive, '按「離開」回到設定頁，沒有結算彈窗也沒有結算頁');
+  await l.close();
+}
+
+{
+  const f = await newTab();
+  await f.goto(BASE);
+  await f.waitForSelector('#screen-setup.active');
+  check(!(await f.isVisible('#lock-box')), '沒有挑戰時設定頁不顯示鎖定提示條');
+  await f.close();
 }
 
 check(errors.length === 0, `主控台沒有錯誤${errors.length ? '：' + errors.join(' | ') : ''}`);

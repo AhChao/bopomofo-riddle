@@ -118,6 +118,7 @@ button.primary:hover { background: var(--vermilion-hover); }
 .cell > span { position: relative; z-index: 1; }
 .cell .zy { position: absolute; z-index: 1; top: 4px; left: 0; right: 0; font-size: 13px; color: var(--muted); font-family: var(--serif); }
 .cell.has-zy > .ch { margin-top: 14px; }
+.cell.given { font-weight: 700; background: var(--tint); border-color: var(--ink); } /* 已給的原字與注音符號（如「一」與「ㄧ」）長得很像，用底色區分 */
 
 .answer-row { max-width: 420px; margin: 8px auto 0; }
 #answer { font-size: 22px; text-align: center; padding: 8px 10px; }
@@ -146,6 +147,7 @@ footer a { color: inherit; }
 
 /* 參數列 */
 .param { display: flex; align-items: center; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
+.param[hidden] { display: none; }
 .param > label, .param > .lbl { width: 5.5em; color: var(--muted); font-size: 14px; letter-spacing: .1em; }
 .param input[type=range] { flex: 1 1 160px; accent-color: var(--vermilion); }
 .param output { width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
@@ -229,6 +231,7 @@ button.ghost.small { padding: 5px 12px; font-size: 14px; }
 
 /* 挑戰模式：設定隨分享碼鎖定 */
 .lock-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 10px 14px; background: var(--tint); border-left: 4px solid var(--vermilion); font-size: 15px; }
+.lock-box[hidden], .challenge[hidden] { display: none; }
 .choice:disabled, .param input:disabled, .check input:disabled, .seed:disabled { opacity: .55; cursor: not-allowed; }
 .choice:disabled:hover { background: transparent; }
 .choice.on:disabled:hover { background: var(--ink); }
@@ -238,3 +241,9 @@ button.ghost.small { padding: 5px 12px; font-size: 14px; }
 .warn-text { color: var(--vermilion); }
 .round .ghost.small { margin-left: 10px; padding: 2px 10px; font-size: 13px; }
 .ui-modal__footer { flex-wrap: wrap; }
+.leave-modal { max-width: 360px; }
+
+/* 結算頁的詞：連結不用預設藍線，底部虛線示意可點，hover 變朱砂 */
+a.dict-link { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--muted); }
+a.dict-link:hover { color: var(--vermilion); border-bottom-color: var(--vermilion); }
+a.dict-link:focus-visible { outline: 2px solid var(--ui-focus-ring); outline-offset: 2px; }

@@ -18,13 +18,15 @@ const MODE_HELP = {
   tones: '輸入聲調依序符合的詞。一聲 ˉ、二聲 ˊ、三聲 ˇ、四聲 ˋ、輕聲 ˙。',
 };
 const PROMPT_HELP = {
-  initials: (len) => `${len} 個字，每個字的注音第一個符號依序是這些`,
+  initials: (len, hint = 0) => (hint
+    ? `${len} 個字，其中 ${hint} 個字已給出，其餘每個字給的是注音第一個符號`
+    : `${len} 個字，每個字的注音第一個符號依序是這些`),
   prefix: (len) => `以這 ${len} 個字開頭的詞`,
   tones: (len) => `${len} 個字，聲調依序是這些`,
 };
 
 const settings = {
-  mode: 'initials', length: 2, difficulty: 'normal', lives: 3, turnSeconds: 10, longBonus: true, overtime: false, symbolBonus: true,
+  mode: 'initials', length: 2, difficulty: 'normal', lives: 3, turnSeconds: 10, longBonus: true, overtime: false, symbolBonus: true, hint: 0,
 };
 let challenge = null; // 從分享碼載入的挑戰：{ seed, settings, result }；有值時設定與種子鎖定，確保雙方條件相同
 let mine = null; // 載入挑戰前自己的設定；挑戰期間不寫進本機偏好，取消挑戰時還原
@@ -39,8 +41,16 @@ const overModal = initModalShell($('over-modal'), {
   closeOnEsc: false,
   initialFocus: '#btn-over-ok',
 });
+// 離開確認：只防誤觸，計時不暫停（和多人一致）；點背景或 Esc 等同「繼續玩」
+const leaveModal = initModalShell($('leave-modal'), { initialFocus: '#btn-leave-stay' });
 
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, Number(n) || lo));
+
+// 已知字數只在注音縮寫有效，且必須落在 0 到 詞長-1；模式或詞長一變就檢查，超出就重設為 0
+function fixHint() {
+  const h = settings.hint;
+  settings.hint = settings.mode === 'initials' && Number.isInteger(h) && h >= 1 && h <= settings.length - 1 ? h : 0;
+}
 
 function saveSettings() {
   try { localStorage.setItem('bopomofo-master', JSON.stringify({ ...(challenge ? mine : settings), names: $('names').value })); } catch {}
@@ -56,12 +66,15 @@ function loadSettings() {
     if (typeof s.longBonus === 'boolean') settings.longBonus = s.longBonus;
     if (typeof s.overtime === 'boolean') settings.overtime = s.overtime;
     if (typeof s.symbolBonus === 'boolean') settings.symbolBonus = s.symbolBonus;
+    if (Number.isInteger(s.hint)) settings.hint = s.hint;
     if (typeof s.names === 'string' && s.names.trim()) $('names').value = s.names;
   } catch {}
   if (!MODES[settings.mode].lengths.includes(settings.length)) settings.length = MODES[settings.mode].lengths[0];
+  fixHint();
 }
 
 function renderSetup() {
+  fixHint();
   const locked = !!challenge;
   renderChoices($('mode-options'), Object.entries(MODES).map(([k, v]) => [k, v.label]), settings.mode, (v) => {
     settings.mode = v;
@@ -78,6 +91,15 @@ function renderSetup() {
     settings.difficulty = v;
     renderSetup();
   }, locked);
+  const ini = settings.mode === 'initials';
+  $('hint-param').hidden = !ini;
+  if (ini) {
+    const opts = Array.from({ length: settings.length }, (_, h) => [h, h ? `給 ${h} 字` : '不給字']);
+    renderChoices($('hint-options'), opts, settings.hint, (v) => {
+      settings.hint = Number(v);
+      renderSetup();
+    }, locked);
+  }
   $('time-range').value = settings.turnSeconds;
   $('time-out').textContent = `${settings.turnSeconds} 秒`;
   $('lives-range').value = settings.lives;
@@ -89,7 +111,7 @@ function renderSetup() {
   $('seed-input').disabled = locked;
   $('lock-box').hidden = !locked;
   updateSetupLink();
-  if (locked) $('lock-text').textContent = `挑戰模式：設定與種子碼已鎖定，和朋友一樣（每題 ${settings.turnSeconds} 秒、${settings.lives} 顆心${settings.overtime ? '、縮短計時' : ''}${settings.longBonus ? '' : '、不計長詞加分'}${settings.symbolBonus ? '' : '、不能集符號回血'}）。`;
+  if (locked) $('lock-text').textContent = `挑戰模式：設定與種子碼已鎖定，和朋友一樣（每題 ${settings.turnSeconds} 秒、${settings.lives} 顆心${settings.hint ? `、給 ${settings.hint} 字` : ''}${settings.overtime ? '、縮短計時' : ''}${settings.longBonus ? '' : '、不計長詞加分'}${settings.symbolBonus ? '' : '、不能集符號回血'}）。`;
 }
 
 // 設定頁的分享連結：目前的設定加種子，開局前就能複製給朋友
@@ -129,7 +151,7 @@ function startGame() {
   game = new Game({
     index, mode: settings.mode, length: settings.length, difficulty: settings.difficulty,
     names, lives: settings.lives, turnSeconds: settings.turnSeconds,
-    longBonus: settings.longBonus, overtime: settings.overtime, symbolBonus: settings.symbolBonus, seed,
+    longBonus: settings.longBonus, overtime: settings.overtime, symbolBonus: settings.symbolBonus, hint: settings.hint, seed,
   });
   game.start(performance.now());
   $('bomb').innerHTML = BOMB_SVG;
@@ -145,7 +167,7 @@ function startGame() {
 function refresh(fresh = []) {
   renderPlayers(game, Math.max(settings.lives, ...game.players.map((p) => p.lives)));
   renderPrompt(game);
-  $('prompt-help').textContent = PROMPT_HELP[game.mode](game.length);
+  $('prompt-help').textContent = PROMPT_HELP[game.mode](game.length, game.hint);
   $('turn-name').textContent = `輪到 ${game.current.name}`;
   $('round').textContent = `第 ${game.round} 題`;
   $('seed-tag').textContent = game.seed;
@@ -183,6 +205,7 @@ function endGame() {
   renderRanking(game);
   renderReview(game);
   renderSummary(game);
+  leaveModal.close(); // 離開確認還開著時炸彈爆了，先收掉再跳結算
   overModal.open();
 }
 
@@ -191,7 +214,9 @@ const REASON = {
   used: '這個詞本局用過了',
   'wrong-prefix': () => `要以「${game.prompt}」開頭，而且比它更長`,
   'wrong-pattern': () => ({
-    initials: `要是 ${game.length} 個字，而且每個字的注音第一個符號符合提示`,
+    initials: game.hint
+      ? `要是 ${game.length} 個字，已給的字要一樣，其餘字的注音第一個符號要符合提示`
+      : `要是 ${game.length} 個字，而且每個字的注音第一個符號符合提示`,
     tones: `要是 ${game.length} 個字，而且聲調符合提示`,
   })[game.mode],
 };
@@ -220,14 +245,25 @@ $('btn-submit').onclick = submit;
 $('btn-start').onclick = startGame;
 $('btn-over-ok').onclick = () => { overModal.close(); show('over'); };
 $('btn-replay').onclick = () => { cancelChallenge(); startGame(); };
-$('btn-again').onclick = () => {
-  // 回設定預設留白（每次隨機）；自己改過的種子保留
-  if (!challenge && normalizeSeed($('seed-input').value) === played?.seed) $('seed-input').value = '';
-  renderSetup();
-  show('setup');
-};
+// 回設定一律解除挑戰（cancelChallenge 會還原自己的設定、清空種子，下一局每次隨機）
+$('btn-again').onclick = () => { cancelChallenge(); show('setup'); };
 $('btn-game-copy').onclick = () => copyWithLabel($('btn-game-copy'), linkFor(index, played.settings, played.seed));
 $('btn-over-copy').onclick = () => copyWithLabel($('btn-over-copy'), $('share-code').value);
+
+// ---- 對局中離開：不產生結算與分享碼，回設定頁 ----
+$('btn-leave').onclick = () => leaveModal.open();
+$('btn-leave-stay').onclick = () => leaveModal.close();
+$('btn-leave-confirm').onclick = () => {
+  leaveModal.close();
+  clearInterval(timer);
+  game = null; // 之後 submit 會因為沒有 game 直接返回
+  $('bomb').classList.remove('warn', 'hot');
+  $('keyboard').classList.remove('complete');
+  $('answer').value = '';
+  feedback('', '');
+  cancelChallenge();
+  show('setup');
+};
 
 // ---- 分享：產生碼、複製、載入朋友的碼 ----
 function renderShare() {
@@ -239,7 +275,7 @@ function renderShare() {
   const box = $('challenge');
   const s = played.settings;
   // 設定完全相同（含每題時間、生命、開關）才比分數，否則不公平
-  const KEYS = ['mode', 'length', 'difficulty', 'turnSeconds', 'lives', 'longBonus', 'overtime', 'symbolBonus'];
+  const KEYS = ['mode', 'length', 'difficulty', 'turnSeconds', 'lives', 'longBonus', 'overtime', 'symbolBonus', 'hint'];
   const same = challenge && challenge.result && challenge.seed === played.seed && KEYS.every((k) => challenge.settings[k] === s[k]);
   box.hidden = !same;
   if (same) {
@@ -300,8 +336,15 @@ async function boot() {
   const res = await fetch('data/words.json');
   index = buildIndex((await res.json()).words);
   show('setup');
-  const c = new URLSearchParams(location.search).get('c');
-  if (c) loadCode(c); else renderSetup();
+  const params = new URLSearchParams(location.search);
+  const c = params.get('c');
+  if (c) {
+    // 挑戰只在進站當下生效：把 c= 從網址拿掉，重新整理不會再鎖定，其他參數保留
+    params.delete('c');
+    const rest = params.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    loadCode(c);
+  } else renderSetup();
 }
 boot().catch(() => {
   document.querySelector('#screen-loading p').textContent = '詞庫載入失敗，請重新整理。';
