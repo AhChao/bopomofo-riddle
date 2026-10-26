@@ -1,6 +1,6 @@
 // 回合狀態機（本地版）。每一題獨立計時：換人、換題就把時間重設成完整的一題時間。
 // 時間由呼叫端傳入 now（毫秒），不自己開計時器，之後可原樣放進 Durable Object。
-import { buildPool, promptOrder, check, scoreOf, examples, minAnswersFor, symbolsOf, ALL_SYMBOLS } from './core.js';
+import { buildPool, promptOrder, check, scoreOf, examples, resolveMinAnswers, effectiveHint, symbolsOf, ALL_SYMBOLS } from './core.js';
 
 export const DEFAULTS = { lives: 3, turnSeconds: 10 };
 export const MAX_LIVES = 10;
@@ -9,10 +9,11 @@ const OVERTIME_STEP_MS = 250;
 const OVERTIME_FLOOR_MS = 3000;
 
 export class Game {
-  constructor({ index, mode, length, difficulty, names, lives = DEFAULTS.lives, turnSeconds = DEFAULTS.turnSeconds, minAnswers, longBonus = true, overtime = false, symbolBonus = true, seed = 'default', rng = Math.random }) {
+  constructor({ index, mode, length, difficulty, names, lives = DEFAULTS.lives, turnSeconds = DEFAULTS.turnSeconds, minAnswers, hint = 0, longBonus = true, overtime = false, symbolBonus = true, seed = 'default', rng = Math.random }) {
     this.index = index;
     this.mode = mode;
     this.length = length;
+    this.hint = effectiveHint(mode, length, hint); // 已知字數：只有注音縮寫有效，其餘為 0
     this.baseMs = turnSeconds * 1000;
     this.turnMs = this.baseMs;
     this.seed = seed;
@@ -22,7 +23,7 @@ export class Game {
     this.log = []; // 每一題的結果：{ round, player, prompt, outcome: 'ok' | 'timeout', ... }
     this.wrong = []; // 答錯的輸入：{ round, player, prompt, input, reason }
     this.rng = rng;
-    this.pool = buildPool(index, mode, length, minAnswers ?? minAnswersFor(mode, length, difficulty));
+    this.pool = buildPool(index, mode, length, resolveMinAnswers(index, mode, length, difficulty, this.hint, minAnswers), this.hint);
     this.order = promptOrder(this.pool, seed);
     this.players = names.map((name) => ({ name, lives, score: 0, words: [], streak: 0, bestStreak: 0, timeouts: 0, wrongTries: 0, best: null, symbols: new Set(), stars: 0 }));
     this.used = new Set();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildIndex } from '../web/js/core.js';
+import { buildIndex, check, examples, ALL_SYMBOLS } from '../web/js/core.js';
 import { Game } from '../web/js/game.js';
 
 // 小型假詞庫：每個提示只要有 1 個解就能開局
@@ -118,4 +118,20 @@ test('注音符號集滿一輪：加一顆心、鍵盤重來；關掉就不加',
   assert.ok(on.results[0].newSymbols.length >= 2);
   const off = run(false);
   assert.equal(off.g.players[0].lives, 2);
+});
+
+test('已知字數：開局提示帶原字，答對與 examples 都是池裡的合法答案', () => {
+  const g = make({ hint: 1 });
+  g.start(0);
+  assert.equal(g.hint, 1);
+  assert.ok([...g.prompt].some((c) => !ALL_SYMBOLS.includes(c)), g.prompt);
+  for (const ex of examples(g.pool, g.prompt, 5, () => 0)) {
+    assert.equal(check({ index, pool: g.pool, mode: 'initials', length: 2, prompt: g.prompt, input: ex, used: new Set() }).ok, true, ex);
+  }
+  assert.equal(g.submit(g.pool.get(g.prompt)[0], 0).ok, true);
+});
+
+test('已知字數：同種子同設定題序相同；非注音縮寫忽略 hint', () => {
+  assert.deepEqual(make({ hint: 1, seed: 'S1' }).order, make({ hint: 1, seed: 'S1' }).order);
+  assert.equal(make({ mode: 'tones', hint: 1 }).hint, 0);
 });
